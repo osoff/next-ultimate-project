@@ -1,11 +1,13 @@
 "use client";
 
-import React, { useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 import { Search } from "lucide-react";
-import { useClickAway } from "react-use";
+import { useClickAway, useDebounce } from "react-use";
 import Link from "next/link";
 import Image from "next/image";
+import { productSearch } from "@/services/products";
+import { Product } from "@prisma/client";
 
 interface SeachInputProps {
   className?: string;
@@ -13,10 +15,31 @@ interface SeachInputProps {
 
 const SeachInput: React.FC<SeachInputProps> = ({ className }) => {
   const [focused, setFocused] = useState(false);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [searchQuery, setSearchQuery] = useState("");
   const ref = useRef(null);
   useClickAway(ref, () => {
     setFocused(false);
   });
+
+  useDebounce(
+    async () => {
+      try {
+        const response = await productSearch(searchQuery);
+        setProducts(response);
+      } catch (e) {
+        console.log(e);
+      }
+    },
+    300,
+    [searchQuery]
+  );
+
+  function handleClickItem() {
+    setFocused(false);
+    setSearchQuery("");
+    setProducts([]);
+  }
   return (
     <>
       <div
@@ -39,27 +62,33 @@ const SeachInput: React.FC<SeachInputProps> = ({ className }) => {
           type="text"
           placeholder="Search product..."
           onFocus={() => setFocused(true)}
-          // value={searchQuery}
-          // onChange={(e) => setSearchQuery(e.target.value)}
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
         />
-        <div
-          className={cn(
-            "absolute w-full bg-white rounded-xl py-2 top-14 shadow-md transition-all duration-400 invisible opacity-0 z-30",
-            focused && "visible opacity-100 top-12"
-          )}
-        >
-          <Link
-            href={"/product/1"}
-            className="flex items-center gap-3 w-full px-3 py-2 hover:bg-primary/10"
+        {products.length > 0 && (
+          <div
+            className={cn(
+              "absolute w-full bg-white rounded-xl py-2 top-14 shadow-md transition-all duration-400 invisible opacity-0 z-30",
+              focused && "visible opacity-100 top-12"
+            )}
+            onClick={handleClickItem}
           >
-            <img
-              src="https://cdn.dodostatic.net/static/Img/Ingredients/cdea869ef287426386ed634e6099a5ba.png"
-              alt="product1"
-              className=" rounded-sm size-8"
-            />
-            <span>Pizza 1</span>
-          </Link>
-        </div>
+            {products.map((product) => (
+              <Link
+                key={product.id}
+                href={`/product/${product.id}`}
+                className="flex items-center gap-3 w-full px-3 py-2 hover:bg-primary/10"
+              >
+                <img
+                  src={product.imageUrl}
+                  alt={product.name}
+                  className=" rounded-sm size-8"
+                />
+                <span>{product.name}</span>
+              </Link>
+            ))}
+          </div>
+        )}
       </div>
     </>
   );
